@@ -107,12 +107,12 @@ function isNewerVersion(current, remote) {
     }
     return false;
 }
-function httpsGet(urlOptions) {
+function httpsGet(url, options) {
     return new Promise((resolve, reject) => {
-        https.get(urlOptions, (res) => {
+        https.get(url, options, (res) => {
             // Handle redirects
             if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                return httpsGet(res.headers.location).then(resolve).catch(reject);
+                return httpsGet(res.headers.location, options).then(resolve).catch(reject);
             }
             if (res.statusCode !== 200) {
                 return reject(new Error(`Status ${res.statusCode}`));
@@ -139,7 +139,7 @@ async function fetchGitHubFile(filepath) {
             "User-Agent": "Open-Claude-Updater"
         }
     };
-    return httpsGet({ ...new URL(url), ...options });
+    return httpsGet(url, options);
 }
 function downloadGitHubFile(filepath, dest, redirectUrl) {
     return new Promise((resolve, reject) => {
@@ -152,7 +152,7 @@ function downloadGitHubFile(filepath, dest, redirectUrl) {
                 "User-Agent": "Open-Claude-Updater"
             }
         };
-        https.get({ ...new URL(targetUrl), ...options }, (res) => {
+        https.get(targetUrl, options, (res) => {
             // Handle redirect
             if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                 return downloadGitHubFile(filepath, dest, res.headers.location).then(resolve).catch(reject);

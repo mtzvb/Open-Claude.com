@@ -93,12 +93,12 @@ function isNewerVersion(current: string, remote: string): boolean {
   return false;
 }
 
-function httpsGet(urlOptions: any): Promise<any> {
+function httpsGet(url: string, options: any): Promise<any> {
   return new Promise((resolve, reject) => {
-    https.get(urlOptions, (res) => {
+    https.get(url, options, (res) => {
       // Handle redirects
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return httpsGet(res.headers.location).then(resolve).catch(reject);
+        return httpsGet(res.headers.location, options).then(resolve).catch(reject);
       }
       
       if (res.statusCode !== 200) {
@@ -124,7 +124,7 @@ async function fetchGitHubFile(filepath: string): Promise<any> {
       "User-Agent": "Open-Claude-Updater"
     }
   };
-  return httpsGet({ ...new URL(url), ...options });
+  return httpsGet(url, options);
 }
 
 function downloadGitHubFile(filepath: string, dest: string, redirectUrl?: string): Promise<void> {
@@ -140,7 +140,7 @@ function downloadGitHubFile(filepath: string, dest: string, redirectUrl?: string
       }
     };
 
-    https.get({ ...new URL(targetUrl), ...options }, (res) => {
+    https.get(targetUrl, options, (res) => {
       // Handle redirect
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return downloadGitHubFile(filepath, dest, res.headers.location).then(resolve).catch(reject);
