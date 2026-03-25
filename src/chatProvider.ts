@@ -87,7 +87,17 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _addEditorContext() {
-    const editor = vscode.window.activeTextEditor;
+    let editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      // Fallback to visible editors if webview has focus
+      const visibleEditors = vscode.window.visibleTextEditors.filter(
+        (e) => e.document.uri.scheme === "file" || e.document.uri.scheme === "untitled"
+      );
+      if (visibleEditors.length > 0) {
+        editor = visibleEditors[0];
+      }
+    }
+    
     if (!editor) {
       vscode.window.showWarningMessage("No active editor found.");
       return;
@@ -167,7 +177,16 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _insertCodeToEditor(code: string) {
-    const editor = vscode.window.activeTextEditor;
+    let editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      const visibleEditors = vscode.window.visibleTextEditors.filter(
+        (e) => e.document.uri.scheme === "file" || e.document.uri.scheme === "untitled"
+      );
+      if (visibleEditors.length > 0) {
+        editor = visibleEditors[0];
+      }
+    }
+    
     if (!editor) {
       vscode.window.showWarningMessage("Không có editor đang mở.");
       return;
