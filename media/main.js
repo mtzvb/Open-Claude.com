@@ -23,7 +23,8 @@
   const btnStop       = document.getElementById("btnStop");
   const btnClear      = document.getElementById("btnClear");
   const btnSettings   = document.getElementById("btnSettings");
-  const btnAddContext  = document.getElementById("btnAddContext");
+  const btnAddContext = document.getElementById("btnAddContext");
+  const btnAttach     = document.getElementById("btnAttach");
   const modelSelect   = document.getElementById("modelSelect");
   const apiKeyWarning = document.getElementById("apiKeyWarning");
   const linkSettings  = document.getElementById("linkSettings");
@@ -55,7 +56,12 @@
   btnStop.addEventListener("click",      stopGeneration);
   btnClear.addEventListener("click",     clearChat);
   btnSettings.addEventListener("click",  openSettings);
-  btnAddContext.addEventListener("click", addContext);
+  if (btnAddContext) btnAddContext.addEventListener("click", addContext);
+  if (btnAttach) {
+    btnAttach.addEventListener("click", () => {
+      vscode.postMessage({ type: "pickFiles" });
+    });
+  }
   linkSettings.addEventListener("click", openSettings);
   modelSelect.addEventListener("change", () => {
     currentModel = modelSelect.value;

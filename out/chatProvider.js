@@ -98,6 +98,9 @@ class OpenClaudeViewProvider {
                 case "addContext":
                     this._addEditorContext();
                     break;
+                case "pickFiles":
+                    this._handlePickFiles();
+                    break;
             }
         });
         // Send initial config
@@ -219,6 +222,68 @@ class OpenClaudeViewProvider {
         });
         vscode.window.showInformationMessage("Code đã được chèn vào editor!");
     }
+    async _handlePickFiles() {
+        const uris = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: true,
+            canSelectMany: true,
+            openLabel: "Đính kèm vào Chat",
+        });
+        if (!uris || uris.length === 0)
+            return;
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Đang đọc nội dung file...",
+            cancellable: false,
+        }, async () => {
+            for (const uri of uris) {
+                const stat = await vscode.workspace.fs.stat(uri);
+                if (stat.type === vscode.FileType.Directory) {
+                    // It's a directory -> recursively read text files
+                    const files = await this._readDirectoryRecursive(uri);
+                    if (files.length === 0)
+                        continue;
+                    let combinedText = "";
+                    for (const f of files) {
+                        const buf = await vscode.workspace.fs.readFile(f);
+                        const text = Buffer.from(buf).toString("utf8");
+                        const relPath = vscode.workspace.asRelativePath(f);
+                        combinedText += `\n// File: ${relPath}\n${text}\n`;
+                    }
+                    const folderName = path.basename(uri.fsPath);
+                    this._postMessage({ type: "addContext", fileName: `📁 ${folderName}`, text: combinedText });
+                }
+                else {
+                    // Single file
+                    const buf = await vscode.workspace.fs.readFile(uri);
+                    const text = Buffer.from(buf).toString("utf8");
+                    const fileName = path.basename(uri.fsPath);
+                    this._postMessage({ type: "addContext", fileName: `📄 ${fileName}`, text: `\n// File: ${fileName}\n${text}\n` });
+                }
+            }
+        });
+    }
+    async _readDirectoryRecursive(dir) {
+        const results = [];
+        const entries = await vscode.workspace.fs.readDirectory(dir);
+        for (const [name, type] of entries) {
+            // Ignore binary folders and common huge folders
+            if (name === "node_modules" || name === ".git" || name === "dist" || name === "build" || name === ".vs") {
+                continue;
+            }
+            const fullUri = vscode.Uri.joinPath(dir, name);
+            if (type === vscode.FileType.Directory) {
+                results.push(...(await this._readDirectoryRecursive(fullUri)));
+            }
+            else if (type === vscode.FileType.File || type === vscode.FileType.SymbolicLink) {
+                // Exclude common binary files
+                if (/\.(png|jpg|jpeg|gif|ico|mp4|webm|zip|tar|gz|exe|dll|bin|pdf|woff|woff2|ttf)$/i.test(name))
+                    continue;
+                results.push(fullUri);
+            }
+        }
+        return results;
+    }
     _postMessage(msg) {
         this._view?.webview.postMessage(msg);
     }
@@ -339,10 +404,16 @@ class OpenClaudeViewProvider {
     <!-- Input Area -->
     <div id="inputArea" class="input-area">
       <div class="input-toolbar">
-        <button id="btnAddContext" class="tool-btn" title="Add editor selection to chat">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          Add Code
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button id="btnAttach" class="tool-btn" title="Chọn file hoặc thư mục đính kèm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Attach
+          </button>
+          <button id="btnAddContext" class="tool-btn" title="Add active editor code">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Add Code
+          </button>
+        </div>
         <span id="tokenCountDisplay" class="token-hint"></span>
       </div>
       <div id="contextPills" class="context-pills"></div>
