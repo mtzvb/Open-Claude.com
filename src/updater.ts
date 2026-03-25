@@ -38,7 +38,11 @@ export async function checkForUpdates(context: vscode.ExtensionContext, manualCh
     }
   } catch (err: any) {
     if (manualCheck) {
-      vscode.window.showErrorMessage(`❌ Lỗi kiểm tra cập nhật: ${err.message}`);
+      if (err.message && err.message.includes("404")) {
+        vscode.window.showErrorMessage("❌ Lỗi 404: Không tìm thấy Repo. Nếu đây là Private Repo, vui lòng nhập GitHub Token trong Cài đặt (⚙️).");
+      } else {
+        vscode.window.showErrorMessage(`❌ Lỗi kiểm tra cập nhật: ${err.message}`);
+      }
     }
     console.error("Open Claude update check failed:", err);
   }
