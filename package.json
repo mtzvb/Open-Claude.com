@@ -2,7 +2,7 @@
   "name": "open-claude",
   "displayName": "Open Claude",
   "description": "AI coding assistant powered by Open Claude — chat, code, stream, and inject with 23+ frontier models.",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "publisher": "open-claude",
   "engines": {
     "vscode": "^1.93.0"
