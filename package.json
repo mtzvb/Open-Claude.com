@@ -7,11 +7,6 @@
   "engines": {
     "vscode": "^1.93.0"
   },
-  "categories": [
-    "AI",
-    "Chat",
-    "Other"
-  ],
   "keywords": [
     "ai",
     "claude",
@@ -20,6 +15,10 @@
     "copilot",
     "cline"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mtzvb/Open-Claude.com.git"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
