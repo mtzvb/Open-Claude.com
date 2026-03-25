@@ -420,6 +420,21 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
 
 .token-hint { font-size: 10.5px; color: var(--text-muted); }
 
+/* ── Context Attachments ── */
+.context-pills {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 4px 8px; font-size: 11px;
+  color: var(--text-secondary);
+}
+.pill .remove-pill {
+  cursor: pointer; opacity: 0.6; transition: 0.2s;
+}
+.pill .remove-pill:hover { opacity: 1; color: #f87171; }
+
 .input-wrapper {
   display: flex; align-items: flex-end; gap: 8px;
   background: var(--bg-card);

@@ -141,7 +141,7 @@ class OpenClaudeViewProvider {
         const lang = editor.document.languageId;
         const fileName = path.basename(editor.document.fileName);
         const contextText = `\`\`\`${lang}\n// File: ${fileName}\n${text}\n\`\`\``;
-        this._postMessage({ type: "addContext", text: contextText });
+        this._postMessage({ type: "addContext", text: contextText, fileName });
         if (this._view && !this._view.visible) {
             this._view.show(true);
         }
@@ -345,6 +345,7 @@ class OpenClaudeViewProvider {
         </button>
         <span id="tokenCountDisplay" class="token-hint"></span>
       </div>
+      <div id="contextPills" class="context-pills"></div>
       <div class="input-wrapper">
         <textarea
           id="userInput"

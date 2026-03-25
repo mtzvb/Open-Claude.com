@@ -14,6 +14,7 @@
   let currentModel = "claude-opus-4.6";
   let currentAssistantEl = null;
   let previousState = vscode.getState() || { messages: [] };
+  let attachedContexts = [];
 
   // --- DOM Refs ---
   const messageList   = document.getElementById("messageList");
@@ -116,7 +117,7 @@
         clearMessages();
         break;
       case "addContext":
-        insertContextToInput(msg.text);
+        addContextMessage(msg.fileName, msg.text);
         break;
     }
   });
@@ -160,17 +161,28 @@
   function sendMessage() {
     if (isGenerating) return;
     const text = userInput.value.trim();
-    if (!text) return;
+    if (!text && attachedContexts.length === 0) return;
+
+    let finalPrompt = "";
+    if (attachedContexts.length > 0) {
+      attachedContexts.forEach(ctx => {
+        finalPrompt += ctx.text + "\n\n";
+      });
+    }
+    finalPrompt += text;
 
     // Remove welcome card
     const welcomeCard = document.querySelector(".welcome-card");
     if (welcomeCard) welcomeCard.remove();
 
-    appendUserMessage(text);
+    appendUserMessage(text, attachedContexts);
+    attachedContexts = [];
+    renderPills();
+
     userInput.value = "";
     autoResize();
 
-    vscode.postMessage({ type: "sendMessage", text, model: currentModel });
+    vscode.postMessage({ type: "sendMessage", text: finalPrompt, model: currentModel });
   }
 
   function stopGeneration() {
@@ -187,13 +199,22 @@
   // ============================================================
   //  Message rendering
   // ============================================================
-  function appendUserMessage(text) {
+  function appendUserMessage(text, contexts = []) {
     const div = document.createElement("div");
     div.className = "message user-message";
+    
+    let pillsHtml = "";
+    if (contexts && contexts.length > 0) {
+      pillsHtml = `<div class="context-pills" style="margin-bottom: 8px;">` + 
+        contexts.map(c => `<div class="pill">📎 ${escapeHtml(c.fileName)}</div>`).join("") + 
+        `</div>`;
+    }
+
     div.innerHTML = `
       <div class="message-avatar user-avatar">U</div>
       <div class="message-content">
-        <div class="message-text">${escapeHtml(text)}</div>
+        ${pillsHtml}
+        ${text ? `<div class="message-text">${escapeHtml(text)}</div>` : ''}
       </div>`;
     messageList.appendChild(div);
     scrollToBottom();
@@ -396,13 +417,33 @@
     vscode.postMessage({ type: "addContext" });
   }
 
-  function insertContextToInput(text) {
-    const pos = userInput.selectionStart;
-    const before = userInput.value.slice(0, pos);
-    const after = userInput.value.slice(pos);
-    userInput.value = before + "\n\n" + text + "\n\n" + after;
+  function addContextMessage(fileName, text) {
+    attachedContexts.push({ fileName, text });
+    renderPills();
     userInput.focus();
-    autoResize();
+  }
+
+  function renderPills() {
+    const container = document.getElementById("contextPills");
+    if (!container) return;
+    container.innerHTML = "";
+    attachedContexts.forEach((ctx, idx) => {
+      const div = document.createElement("div");
+      div.className = "pill";
+      div.innerHTML = `
+        <span>📎 ${escapeHtml(ctx.fileName)}</span>
+        <span class="remove-pill" data-idx="${idx}">✕</span>
+      `;
+      container.appendChild(div);
+    });
+    
+    container.querySelectorAll(".remove-pill").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const idx = parseInt(e.target.getAttribute("data-idx"));
+        attachedContexts.splice(idx, 1);
+        renderPills();
+      });
+    });
   }
 
   function setGeneratingState(generating) {
