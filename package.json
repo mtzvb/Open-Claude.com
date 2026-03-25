@@ -1,0 +1,164 @@
+{
+  "name": "open-claude",
+  "displayName": "Open Claude",
+  "description": "AI coding assistant powered by Open Claude — chat, code, stream, and inject with 23+ frontier models.",
+  "version": "1.0.0",
+  "publisher": "open-claude",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "claude",
+    "openai",
+    "chat",
+    "copilot",
+    "cline"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "openclaudeContainer",
+          "title": "Open Claude",
+          "icon": "media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "openclaudeContainer": [
+        {
+          "type": "webview",
+          "id": "openclaude.chatView",
+          "name": "Chat",
+          "retainContextWhenHidden": true
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "openclaude.openChat",
+        "title": "Open Chat",
+        "category": "Open Claude"
+      },
+      {
+        "command": "openclaude.newConversation",
+        "title": "New Conversation",
+        "category": "Open Claude",
+        "icon": "$(add)"
+      },
+      {
+        "command": "openclaude.addContext",
+        "title": "Add Selection to Chat",
+        "category": "Open Claude"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "openclaude.addContext",
+          "when": "editorHasSelection",
+          "group": "openclaude"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "openclaude.newConversation",
+          "when": "view == openclaude.chatView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "openclaude.openChat",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o"
+      }
+    ],
+    "configuration": {
+      "title": "Open Claude",
+      "properties": {
+        "openclaude.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Open Claude API Key (from https://open-claude.com/keys)",
+          "markdownDescription": "API Key từ [Open Claude](https://open-claude.com/keys). Giữ bí mật!"
+        },
+        "openclaude.baseUrl": {
+          "type": "string",
+          "default": "https://open-claude.com/v1",
+          "description": "Base URL của Open Claude API"
+        },
+        "openclaude.model": {
+          "type": "string",
+          "default": "claude-opus-4.6",
+          "enum": [
+            "claude-opus-4.6",
+            "claude-sonnet-4.6",
+            "claude-sonnet-4.5",
+            "claude-opus-4.5",
+            "claude-haiku-4.5",
+            "claude-sonnet-4",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.3-codex",
+            "gpt-5.2",
+            "gpt-5.2-codex",
+            "gpt-5.1",
+            "gpt-5.1-codex",
+            "gpt-5.1-codex-mini",
+            "gpt-5.1-codex-max",
+            "gpt-5-mini",
+            "gemini-3-pro-preview",
+            "gemini-3-flash-preview",
+            "gemini-3.1-pro-preview",
+            "gemini-2.5-pro",
+            "grok-code-fast-1",
+            "oswe-vscode-prime",
+            "oswe-vscode-secondary"
+          ],
+          "description": "Model AI mặc định"
+        },
+        "openclaude.maxTokens": {
+          "type": "number",
+          "default": 8192,
+          "description": "Số token tối đa trong mỗi response"
+        },
+        "openclaude.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Temperature (độ sáng tạo) của AI"
+        },
+        "openclaude.systemPrompt": {
+          "type": "string",
+          "default": "You are Open Claude, an expert AI coding assistant. You help developers write, debug, explain, and refactor code. When providing code, use proper markdown code blocks with language identifiers. Be concise, accurate, and helpful.",
+          "description": "System prompt tùy chỉnh cho AI"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.37",
+    "@types/vscode": "^1.93.0",
+    "typescript": "^5.9.3"
+  }
+}

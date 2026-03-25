@@ -1,0 +1,385 @@
+/* ============================================================
+   Open Claude — Webview Main Script
+   Handles: UI interactions, message passing with extension host,
+   streaming rendering, markdown/code highlighting
+   ============================================================ */
+
+(function () {
+  "use strict";
+
+  const vscode = acquireVsCodeApi();
+
+  // --- State ---
+  let isGenerating = false;
+  let currentModel = "claude-opus-4.6";
+  let currentAssistantEl = null;
+  let previousState = vscode.getState() || { messages: [] };
+
+  // --- DOM Refs ---
+  const messageList   = document.getElementById("messageList");
+  const userInput     = document.getElementById("userInput");
+  const btnSend       = document.getElementById("btnSend");
+  const btnStop       = document.getElementById("btnStop");
+  const btnClear      = document.getElementById("btnClear");
+  const btnSettings   = document.getElementById("btnSettings");
+  const btnAddContext  = document.getElementById("btnAddContext");
+  const modelSelect   = document.getElementById("modelSelect");
+  const apiKeyWarning = document.getElementById("apiKeyWarning");
+  const linkSettings  = document.getElementById("linkSettings");
+  const tokenDisplay  = document.getElementById("tokenCountDisplay");
+
+  // --- Init ---
+  vscode.postMessage({ type: "getConfig" });
+
+  // Restore scroll position
+  restoreState();
+
+  // --- Event Listeners ---
+  userInput.addEventListener("input",    autoResize);
+  userInput.addEventListener("keydown",  handleKeyDown);
+  btnSend.addEventListener("click",      sendMessage);
+  btnStop.addEventListener("click",      stopGeneration);
+  btnClear.addEventListener("click",     clearChat);
+  btnSettings.addEventListener("click",  openSettings);
+  btnAddContext.addEventListener("click", addContext);
+  linkSettings.addEventListener("click", openSettings);
+  modelSelect.addEventListener("change", () => {
+    currentModel = modelSelect.value;
+  });
+
+  // Quick action buttons
+  document.querySelectorAll(".quick-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const text = btn.getAttribute("data-text");
+      if (text) {
+        userInput.value = text;
+        userInput.focus();
+        autoResize();
+      }
+    });
+  });
+
+  // --- Message Handler from Extension Host ---
+  window.addEventListener("message", (event) => {
+    const msg = event.data;
+    switch (msg.type) {
+      case "config":
+        applyConfig(msg);
+        break;
+      case "startAssistant":
+        startAssistantMessage();
+        break;
+      case "chunk":
+        appendChunk(msg.delta);
+        break;
+      case "doneAssistant":
+        finishAssistantMessage();
+        break;
+      case "error":
+        showError(msg.message);
+        break;
+      case "cleared":
+        clearMessages();
+        break;
+      case "addContext":
+        insertContextToInput(msg.text);
+        break;
+    }
+  });
+
+  // ============================================================
+  //  Config
+  // ============================================================
+  function applyConfig(cfg) {
+    currentModel = cfg.model || "claude-opus-4.6";
+
+    // Rebuild model select
+    modelSelect.innerHTML = "";
+    const modelList = cfg.models || [{ id: cfg.model, label: cfg.model, provider: "" }];
+    modelList.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = m.label || m.id;
+      opt.title = m.provider || "";
+      if (m.id === currentModel) opt.selected = true;
+      modelSelect.appendChild(opt);
+    });
+
+    // API key warning
+    if (!cfg.apiKey) {
+      apiKeyWarning.classList.remove("hidden");
+    } else {
+      apiKeyWarning.classList.add("hidden");
+    }
+  }
+
+  // ============================================================
+  //  Sending
+  // ============================================================
+  function sendMessage() {
+    if (isGenerating) return;
+    const text = userInput.value.trim();
+    if (!text) return;
+
+    // Remove welcome card
+    const welcomeCard = document.querySelector(".welcome-card");
+    if (welcomeCard) welcomeCard.remove();
+
+    appendUserMessage(text);
+    userInput.value = "";
+    autoResize();
+
+    vscode.postMessage({ type: "sendMessage", text, model: currentModel });
+  }
+
+  function stopGeneration() {
+    vscode.postMessage({ type: "stopGeneration" });
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ============================================================
+  //  Message rendering
+  // ============================================================
+  function appendUserMessage(text) {
+    const div = document.createElement("div");
+    div.className = "message user-message";
+    div.innerHTML = `
+      <div class="message-avatar user-avatar">U</div>
+      <div class="message-content">
+        <div class="message-text">${escapeHtml(text)}</div>
+      </div>`;
+    messageList.appendChild(div);
+    scrollToBottom();
+  }
+
+  function startAssistantMessage() {
+    isGenerating = true;
+    setGeneratingState(true);
+
+    const div = document.createElement("div");
+    div.className = "message assistant-message generating";
+    div.innerHTML = `
+      <div class="message-avatar assistant-avatar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#ag)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs><linearGradient id="ag" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#a78bfa"/><stop offset="100%" style="stop-color:#60a5fa"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="message-content">
+        <div class="message-model-tag">${currentModel}</div>
+        <div class="message-text thinking-dots"><span></span><span></span><span></span></div>
+      </div>`;
+    messageList.appendChild(div);
+    currentAssistantEl = div.querySelector(".message-text");
+    scrollToBottom();
+  }
+
+  let rawBuffer = "";
+
+  function appendChunk(delta) {
+    if (!currentAssistantEl) return;
+    if (currentAssistantEl.classList.contains("thinking-dots")) {
+      currentAssistantEl.classList.remove("thinking-dots");
+      currentAssistantEl.innerHTML = "";
+      rawBuffer = "";
+    }
+    rawBuffer += delta;
+    currentAssistantEl.innerHTML = renderMarkdown(rawBuffer);
+    attachCodeButtons(currentAssistantEl);
+    scrollToBottom();
+  }
+
+  function finishAssistantMessage() {
+    isGenerating = false;
+    setGeneratingState(false);
+    if (currentAssistantEl) {
+      const parent = currentAssistantEl.closest(".assistant-message");
+      if (parent) parent.classList.remove("generating");
+      currentAssistantEl = null;
+      rawBuffer = "";
+    }
+  }
+
+  function showError(message) {
+    isGenerating = false;
+    setGeneratingState(false);
+    if (currentAssistantEl) {
+      currentAssistantEl.innerHTML = `<div class="error-msg">${message}</div>`;
+      currentAssistantEl = null;
+      rawBuffer = "";
+    } else {
+      const div = document.createElement("div");
+      div.className = "message assistant-message";
+      div.innerHTML = `<div class="message-content"><div class="error-msg">${message}</div></div>`;
+      messageList.appendChild(div);
+    }
+    scrollToBottom();
+  }
+
+  function clearMessages() {
+    rawBuffer = "";
+    currentAssistantEl = null;
+    isGenerating = false;
+    setGeneratingState(false);
+    messageList.innerHTML = `
+      <div class="welcome-card">
+        <div class="welcome-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#wg2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs><linearGradient id="wg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#a78bfa"/><stop offset="100%" style="stop-color:#60a5fa"/></linearGradient></defs>
+          </svg>
+        </div>
+        <h2>Open Claude</h2>
+        <p>AI coding assistant với 23+ frontier models.<br/>Chào mừng bạn đến với tương lai của lập trình!</p>
+        <div class="quick-actions">
+          <button class="quick-btn" data-text="Giải thích đoạn code này cho tôi">📖 Giải thích code</button>
+          <button class="quick-btn" data-text="Tìm và sửa bug trong code sau:">🐛 Debug code</button>
+          <button class="quick-btn" data-text="Viết unit tests cho hàm sau:">🧪 Viết tests</button>
+          <button class="quick-btn" data-text="Refactor code này để tối ưu hơn:">⚡ Refactor</button>
+        </div>
+      </div>`;
+    // Reattach quick btn listeners
+    document.querySelectorAll(".quick-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        userInput.value = btn.getAttribute("data-text") || "";
+        userInput.focus();
+        autoResize();
+      });
+    });
+  }
+
+  // ============================================================
+  //  Markdown Renderer (no external deps)
+  // ============================================================
+  function renderMarkdown(text) {
+    let html = text;
+
+    // Fenced code blocks
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+      const langLabel = lang || "code";
+      const escaped = escapeHtml(code.trim());
+      return `<div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">${escapeHtml(langLabel)}</span>
+          <div class="code-actions">
+            <button class="code-btn copy-btn" data-code="${encodeURIComponent(code.trim())}">Copy</button>
+            <button class="code-btn insert-btn" data-code="${encodeURIComponent(code.trim())}">Insert</button>
+          </div>
+        </div>
+        <pre><code class="lang-${escapeHtml(langLabel)}">${escaped}</code></pre>
+      </div>`;
+    });
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, "<code class=\"inline-code\">$1</code>");
+
+    // Bold
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+    // Italic
+    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+
+    // Headers
+    html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+    html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+    html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+
+    // Bullet lists
+    html = html.replace(/^[\*\-] (.+)$/gm, "<li>$1</li>");
+    html = html.replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>");
+
+    // Numbered lists
+    html = html.replace(/^\d+\. (.+)$/gm, "<li>$1</li>");
+
+    // Horizontal rule
+    html = html.replace(/^---$/gm, "<hr/>");
+
+    // Paragraphs (double newlines)
+    html = html.replace(/\n\n/g, "</p><p>");
+
+    // Single newlines
+    html = html.replace(/\n/g, "<br/>");
+
+    return `<p>${html}</p>`;
+  }
+
+  function attachCodeButtons(container) {
+    container.querySelectorAll(".copy-btn").forEach((btn) => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      newBtn.addEventListener("click", () => {
+        const code = decodeURIComponent(newBtn.getAttribute("data-code"));
+        vscode.postMessage({ type: "copyCode", code });
+        newBtn.textContent = "Copied!";
+        setTimeout(() => (newBtn.textContent = "Copy"), 1500);
+      });
+    });
+    container.querySelectorAll(".insert-btn").forEach((btn) => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      newBtn.addEventListener("click", () => {
+        const code = decodeURIComponent(newBtn.getAttribute("data-code"));
+        vscode.postMessage({ type: "insertCode", code });
+      });
+    });
+  }
+
+  // ============================================================
+  //  Helpers
+  // ============================================================
+  function clearChat() {
+    vscode.postMessage({ type: "clearChat" });
+  }
+
+  function openSettings(e) {
+    e.preventDefault();
+    vscode.postMessage({ type: "openSettings" });
+  }
+
+  function addContext() {
+    vscode.postMessage({ type: "addContext" });
+  }
+
+  function insertContextToInput(text) {
+    const pos = userInput.selectionStart;
+    const before = userInput.value.slice(0, pos);
+    const after = userInput.value.slice(pos);
+    userInput.value = before + "\n\n" + text + "\n\n" + after;
+    userInput.focus();
+    autoResize();
+  }
+
+  function setGeneratingState(generating) {
+    btnSend.classList.toggle("hidden", generating);
+    btnStop.classList.toggle("hidden", !generating);
+    userInput.disabled = generating;
+  }
+
+  function autoResize() {
+    userInput.style.height = "auto";
+    userInput.style.height = Math.min(userInput.scrollHeight, 200) + "px";
+  }
+
+  function scrollToBottom() {
+    const container = document.getElementById("chatContainer");
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function restoreState() {
+    // Nothing to restore for now — messages are held in extension host
+  }
+})();
