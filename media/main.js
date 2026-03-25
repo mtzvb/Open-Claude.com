@@ -39,6 +39,7 @@
   const setSystemPrompt = document.getElementById("setSystemPrompt");
   const btnSaveSettings = document.getElementById("btnSaveSettings");
   const btnCloseSettings = document.getElementById("btnCloseSettings");
+  const btnCheckUpdate   = document.getElementById("btnCheckUpdate");
 
   // --- Init ---
   vscode.postMessage({ type: "getConfig" });
@@ -73,6 +74,12 @@
     closeSettings();
   });
   btnCloseSettings.addEventListener("click", closeSettings);
+  
+  if (btnCheckUpdate) {
+    btnCheckUpdate.addEventListener("click", () => {
+      vscode.postMessage({ type: "checkUpdate" });
+    });
+  }
 
   // Quick action buttons
   document.querySelectorAll(".quick-btn").forEach((btn) => {

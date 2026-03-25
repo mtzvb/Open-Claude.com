@@ -39,15 +39,15 @@ const apiClient_1 = require("./apiClient");
 const models_1 = require("./models");
 const path = __importStar(require("path"));
 class OpenClaudeViewProvider {
-    constructor(_extensionUri) {
-        this._extensionUri = _extensionUri;
+    constructor(_context) {
+        this._context = _context;
         this._messages = [];
     }
     resolveWebviewView(webviewView, _context, _token) {
         this._view = webviewView;
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri],
+            localResourceRoots: [this._context.extensionUri],
         };
         webviewView.webview.html = this._getHtmlContent(webviewView.webview);
         // Handle messages from webview
@@ -81,6 +81,11 @@ class OpenClaudeViewProvider {
                     break;
                 case "saveSettings":
                     await this._saveSettings(msg.settings);
+                    break;
+                case "checkUpdate":
+                    Promise.resolve().then(() => __importStar(require("./updater"))).then(({ checkForUpdates }) => {
+                        checkForUpdates(this._context, true);
+                    });
                     break;
                 case "addContext":
                     this._addEditorContext();
@@ -210,7 +215,7 @@ class OpenClaudeViewProvider {
         this._view?.webview.postMessage(msg);
     }
     _getHtmlContent(webview) {
-        const mediaPath = vscode.Uri.joinPath(this._extensionUri, "media");
+        const mediaPath = vscode.Uri.joinPath(this._context.extensionUri, "media");
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaPath, "style.css"));
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaPath, "main.js"));
         const nonce = getNonce();
@@ -295,6 +300,9 @@ class OpenClaudeViewProvider {
       <div class="settings-actions">
         <button id="btnSaveSettings" class="btn-primary">Lưu cấu hình</button>
         <button id="btnCloseSettings" class="btn-secondary">Đóng</button>
+      </div>
+      <div class="settings-actions" style="margin-top: 4px;">
+        <button id="btnCheckUpdate" class="btn-secondary" style="width: 100%;">Kiểm tra bản cập nhật mới nhất</button>
       </div>
     </div>
 

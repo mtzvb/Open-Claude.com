@@ -6,7 +6,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Check for updates from GitHub in the background
   checkForUpdates(context);
 
-  const provider = new OpenClaudeViewProvider(context.extensionUri);
+  const provider = new OpenClaudeViewProvider(context);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(

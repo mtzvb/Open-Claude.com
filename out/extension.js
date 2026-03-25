@@ -41,7 +41,7 @@ const updater_1 = require("./updater");
 function activate(context) {
     // Check for updates from GitHub in the background
     (0, updater_1.checkForUpdates)(context);
-    const provider = new chatProvider_1.OpenClaudeViewProvider(context.extensionUri);
+    const provider = new chatProvider_1.OpenClaudeViewProvider(context);
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(chatProvider_1.OpenClaudeViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } }));
     // Command: Open Chat sidebar
     context.subscriptions.push(vscode.commands.registerCommand("openclaude.openChat", () => {

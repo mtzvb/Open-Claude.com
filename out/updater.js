@@ -40,43 +40,55 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const REPO_RAW_URL = "https://raw.githubusercontent.com/mtzvb/Open-Claude.com/main";
-async function checkForUpdates(context) {
+async function checkForUpdates(context, manualCheck = false) {
     try {
         const currentVersion = context.extension.packageJSON.version;
         const remotePackageJson = await fetchJson(`${REPO_RAW_URL}/package.json`);
-        if (!remotePackageJson || !remotePackageJson.version)
+        if (!remotePackageJson || !remotePackageJson.version) {
+            if (manualCheck) {
+                vscode.window.showErrorMessage("❌ Không thể lấy thông tin phiên bản từ GitHub.");
+            }
             return;
+        }
         const remoteVersion = remotePackageJson.version;
         if (isNewerVersion(currentVersion, remoteVersion)) {
-            const action = await vscode.window.showInformationMessage(`🚀 Open Claude v${remoteVersion} is available! (Current: v${currentVersion})`, "Update Now", "Later");
-            if (action === "Update Now") {
+            const action = await vscode.window.showInformationMessage(`🚀 Open Claude v${remoteVersion} đã sẵn sàng! (Hiện tại: v${currentVersion})`, "Cập nhật ngay", "Để sau");
+            if (action === "Cập nhật ngay") {
                 await downloadAndInstallUpdate(remoteVersion);
+            }
+        }
+        else {
+            if (manualCheck) {
+                vscode.window.showInformationMessage(`✅ Phiên bản v${currentVersion} hiện tại đã là bản mới nhất!`);
             }
         }
     }
     catch (err) {
+        if (manualCheck) {
+            vscode.window.showErrorMessage(`❌ Lỗi kiểm tra cập nhật: ${err.message}`);
+        }
         console.error("Open Claude update check failed:", err);
     }
 }
 async function downloadAndInstallUpdate(version) {
     return vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: `Downloading Open Claude v${version}...`,
+        title: `Đang tải Open Claude v${version}...`,
         cancellable: false,
     }, async (progress) => {
         try {
             const vsixUrl = `${REPO_RAW_URL}/open-claude-${version}.vsix`;
             const tmpVsixPath = path.join(os.tmpdir(), `open-claude-${version}.vsix`);
             await downloadFile(vsixUrl, tmpVsixPath);
-            progress.report({ message: "Installing extension..." });
+            progress.report({ message: "Đang cài đặt extension..." });
             await vscode.commands.executeCommand("workbench.extensions.installExtension", vscode.Uri.file(tmpVsixPath));
-            const reload = await vscode.window.showInformationMessage("✅ Update installed successfully! Please reload VS Code to apply changes.", "Reload Window");
-            if (reload === "Reload Window") {
+            const reload = await vscode.window.showInformationMessage("✅ Cập nhật thành công! Vui lòng tải lại VS Code để áp dụng thay đổi.", "Tải lại (Reload Window)");
+            if (reload === "Tải lại (Reload Window)") {
                 vscode.commands.executeCommand("workbench.action.reloadWindow");
             }
         }
         catch (err) {
-            vscode.window.showErrorMessage(`❌ Update failed: ${err.message}`);
+            vscode.window.showErrorMessage(`❌ Lỗi cập nhật: ${err.message}`);
         }
     });
 }
