@@ -36,11 +36,12 @@
   const settingsPanel = document.getElementById("settingsPanel");
   const setApiKey     = document.getElementById("setApiKey");
   const setBaseUrl    = document.getElementById("setBaseUrl");
-  const setMaxTokens  = document.getElementById("setMaxTokens");
-  const setTemp       = document.getElementById("setTemp");
+  const setMaxTokens    = document.getElementById("setMaxTokens");
+  const setTemp         = document.getElementById("setTemp");
   const setSystemPrompt = document.getElementById("setSystemPrompt");
+  const setGithubToken  = document.getElementById("setGithubToken");
   const btnSaveSettings = document.getElementById("btnSaveSettings");
-  const btnCloseSettings = document.getElementById("btnCloseSettings");
+  const btnCloseSettings= document.getElementById("btnCloseSettings");
   const btnCheckUpdate   = document.getElementById("btnCheckUpdate");
 
   // --- Init ---
@@ -76,7 +77,8 @@
         baseUrl: setBaseUrl.value.trim(),
         maxTokens: parseInt(setMaxTokens.value) || 8192,
         temperature: parseFloat(setTemp.value) || 0.7,
-        systemPrompt: setSystemPrompt.value
+        systemPrompt: setSystemPrompt.value,
+        githubToken: setGithubToken ? setGithubToken.value.trim() : ""
       }
     });
     closeSettings();
@@ -153,6 +155,7 @@
     if (cfg.maxTokens !== undefined) setMaxTokens.value = cfg.maxTokens;
     if (cfg.temperature !== undefined) setTemp.value = cfg.temperature;
     if (cfg.systemPrompt !== undefined) setSystemPrompt.value = cfg.systemPrompt;
+    if (cfg.githubToken !== undefined && setGithubToken) setGithubToken.value = cfg.githubToken;
 
     // API key warning
     if (!cfg.apiKey) {

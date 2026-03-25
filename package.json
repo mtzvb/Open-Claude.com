@@ -2,7 +2,7 @@
   "name": "open-claude",
   "displayName": "Open Claude",
   "description": "AI coding assistant powered by Open Claude — chat, code, stream, and inject with 23+ frontier models.",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "publisher": "open-claude",
   "engines": {
     "vscode": "^1.93.0"
@@ -142,8 +142,13 @@
         },
         "openclaude.systemPrompt": {
           "type": "string",
-          "default": "You are Open Claude, an expert AI coding assistant. You help developers write, debug, explain, and refactor code. When providing code, use proper markdown code blocks with language identifiers. Be concise, accurate, and helpful.",
-          "description": "System prompt tùy chỉnh cho AI"
+          "default": "You are Open Claude. An expert AI coding assistant. Please be extremely concise.",
+          "description": "The system prompt to condition the AI's behavior."
+        },
+        "openclaude.githubToken": {
+          "type": "string",
+          "default": "",
+          "description": "Personal Access Token (PAT) for Open Claude auto-updater (Required if checking private repositories for updates)."
         }
       }
     }

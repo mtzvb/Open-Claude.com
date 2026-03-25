@@ -102,6 +102,7 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
       maxTokens: config.get<number>("maxTokens", 8192),
       temperature: config.get<number>("temperature", 0.7),
       systemPrompt: config.get<string>("systemPrompt", "You are Open Claude..."),
+      githubToken: config.get<string>("githubToken", ""),
       models: MODELS,
     });
   }
@@ -146,6 +147,7 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
     await config.update("maxTokens", Number(settings.maxTokens), vscode.ConfigurationTarget.Global);
     await config.update("temperature", Number(settings.temperature), vscode.ConfigurationTarget.Global);
     await config.update("systemPrompt", settings.systemPrompt, vscode.ConfigurationTarget.Global);
+    await config.update("githubToken", settings.githubToken, vscode.ConfigurationTarget.Global);
     vscode.window.showInformationMessage("Cấu hình Open Claude đã được lưu!");
     this._sendConfig();
   }
@@ -414,6 +416,10 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
       <div class="setting-item">
         <label>System Prompt</label>
         <textarea id="setSystemPrompt" rows="4"></textarea>
+      </div>
+      <div class="setting-item">
+        <label>GitHub Token (Auto-Updater)</label>
+        <input type="password" id="setGithubToken" placeholder="ghp_... (Tùy chọn cho Private Repo)" />
       </div>
       <div class="settings-actions">
         <button id="btnSaveSettings" class="btn-primary">Lưu cấu hình</button>

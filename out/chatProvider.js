@@ -120,6 +120,7 @@ class OpenClaudeViewProvider {
             maxTokens: config.get("maxTokens", 8192),
             temperature: config.get("temperature", 0.7),
             systemPrompt: config.get("systemPrompt", "You are Open Claude..."),
+            githubToken: config.get("githubToken", ""),
             models: models_1.MODELS,
         });
     }
@@ -156,6 +157,7 @@ class OpenClaudeViewProvider {
         await config.update("maxTokens", Number(settings.maxTokens), vscode.ConfigurationTarget.Global);
         await config.update("temperature", Number(settings.temperature), vscode.ConfigurationTarget.Global);
         await config.update("systemPrompt", settings.systemPrompt, vscode.ConfigurationTarget.Global);
+        await config.update("githubToken", settings.githubToken, vscode.ConfigurationTarget.Global);
         vscode.window.showInformationMessage("Cấu hình Open Claude đã được lưu!");
         this._sendConfig();
     }
@@ -394,6 +396,10 @@ class OpenClaudeViewProvider {
       <div class="setting-item">
         <label>System Prompt</label>
         <textarea id="setSystemPrompt" rows="4"></textarea>
+      </div>
+      <div class="setting-item">
+        <label>GitHub Token (Auto-Updater)</label>
+        <input type="password" id="setGithubToken" placeholder="ghp_... (Tùy chọn cho Private Repo)" />
       </div>
       <div class="settings-actions">
         <button id="btnSaveSettings" class="btn-primary">Lưu cấu hình</button>
