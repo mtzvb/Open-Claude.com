@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { OpenClaudeViewProvider } from "./chatProvider";
+import { checkForUpdates } from "./updater";
 
 export function activate(context: vscode.ExtensionContext) {
+  // Check for updates from GitHub in the background
+  checkForUpdates(context);
+
   const provider = new OpenClaudeViewProvider(context.extensionUri);
 
   context.subscriptions.push(

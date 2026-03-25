@@ -37,7 +37,10 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const chatProvider_1 = require("./chatProvider");
+const updater_1 = require("./updater");
 function activate(context) {
+    // Check for updates from GitHub in the background
+    (0, updater_1.checkForUpdates)(context);
     const provider = new chatProvider_1.OpenClaudeViewProvider(context.extensionUri);
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(chatProvider_1.OpenClaudeViewProvider.viewType, provider, { webviewOptions: { retainContextWhenHidden: true } }));
     // Command: Open Chat sidebar
