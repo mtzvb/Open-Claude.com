@@ -100,9 +100,9 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
   private _addEditorContext() {
     let editor = vscode.window.activeTextEditor;
     if (!editor) {
-      // Fallback to visible editors if webview has focus
+      // Fallback to visible editors if webview has focus (support Remote SSH/VFS)
       const visibleEditors = vscode.window.visibleTextEditors.filter(
-        (e) => e.document.uri.scheme === "file" || e.document.uri.scheme === "untitled"
+        (e) => e.document.uri.scheme !== "output"
       );
       if (visibleEditors.length > 0) {
         editor = visibleEditors[0];
@@ -202,7 +202,7 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
     let editor = vscode.window.activeTextEditor;
     if (!editor) {
       const visibleEditors = vscode.window.visibleTextEditors.filter(
-        (e) => e.document.uri.scheme === "file" || e.document.uri.scheme === "untitled"
+        (e) => e.document.uri.scheme !== "output"
       );
       if (visibleEditors.length > 0) {
         editor = visibleEditors[0];
