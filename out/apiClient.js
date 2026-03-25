@@ -43,27 +43,50 @@ class ApiClient {
         this.baseUrl = baseUrl.replace(/\/$/, "");
     }
     async *streamChat(messages, model, maxTokens, temperature, onAbort) {
-        const url = new url_1.URL(`${this.baseUrl}/chat/completions`);
-        const body = JSON.stringify({
+        const isAnthropicFormat = model.startsWith("claude");
+        let path = "/chat/completions";
+        let bodyObj = {
             model,
-            messages,
             max_tokens: maxTokens,
             temperature,
             stream: true,
-        });
+        };
+        if (isAnthropicFormat) {
+            path = "/messages";
+            const anthropicMsg = [];
+            for (const m of messages) {
+                if (m.role === "system") {
+                    bodyObj.system = m.content;
+                }
+                else {
+                    anthropicMsg.push(m);
+                }
+            }
+            bodyObj.messages = anthropicMsg;
+        }
+        else {
+            bodyObj.messages = messages;
+        }
+        const url = new url_1.URL(`${this.baseUrl}${path}`);
+        const body = JSON.stringify(bodyObj);
         const isHttps = url.protocol === "https:";
         const lib = isHttps ? https : http;
+        const headers = {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Accept": "text/event-stream",
+            "Content-Length": Buffer.byteLength(body),
+        };
+        if (isAnthropicFormat) {
+            headers["x-api-key"] = this.apiKey;
+            headers["anthropic-version"] = "2023-06-01";
+        }
         const options = {
             hostname: url.hostname,
             port: url.port || (isHttps ? 443 : 80),
-            path: url.pathname,
+            path: url.pathname + url.search,
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${this.apiKey}`,
-                "Accept": "text/event-stream",
-                "Content-Length": Buffer.byteLength(body),
-            },
+            headers,
         };
         yield* await new Promise((resolve, reject) => {
             let aborted = false;
@@ -97,9 +120,16 @@ class ApiClient {
                             }
                             try {
                                 const parsed = JSON.parse(data);
-                                const delta = parsed?.choices?.[0]?.delta?.content;
-                                if (delta) {
-                                    yield { delta, done: false };
+                                if (isAnthropicFormat) {
+                                    if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+                                        yield { delta: parsed.delta.text, done: false };
+                                    }
+                                }
+                                else {
+                                    const delta = parsed?.choices?.[0]?.delta?.content;
+                                    if (delta) {
+                                        yield { delta, done: false };
+                                    }
                                 }
                             }
                             catch {
