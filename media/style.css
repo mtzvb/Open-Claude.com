@@ -430,6 +430,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
   border-radius: var(--radius-sm); padding: 4px 8px; font-size: 11px;
   color: var(--text-secondary);
 }
+.pill-thumb {
+  width: 20px; height: 20px;
+  border-radius: 2px;
+  object-fit: cover;
+}
 .pill .remove-pill {
   cursor: pointer; opacity: 0.6; transition: 0.2s;
 }

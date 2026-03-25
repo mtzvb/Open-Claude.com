@@ -220,8 +220,8 @@
     if (contexts && contexts.length > 0) {
       pillsHtml = `<div class="context-pills" style="margin-bottom: 8px;">` + 
         contexts.map(c => {
-          const icon = c.isImage ? "🖼️" : "📎";
-          return `<div class="pill">${icon} ${escapeHtml(c.fileName)}</div>`;
+          const mediaHtml = c.isImage ? `<img src="${c.url}" class="pill-thumb" />` : "📎";
+          return `<div class="pill">${mediaHtml} ${escapeHtml(c.fileName)}</div>`;
         }).join("") + 
         `</div>`;
     }
@@ -471,9 +471,9 @@
     attachedContexts.forEach((ctx, idx) => {
       const div = document.createElement("div");
       div.className = "pill";
-      const icon = ctx.isImage ? "🖼️" : "📎";
+      const mediaHtml = ctx.isImage ? `<img src="${ctx.url}" class="pill-thumb" />` : "📎";
       div.innerHTML = `
-        <span>${icon} ${escapeHtml(ctx.fileName)}</span>
+        <span style="display: flex; align-items: center; gap: 6px;">${mediaHtml} ${escapeHtml(ctx.fileName)}</span>
         <span class="remove-pill" data-idx="${idx}">✕</span>
       `;
       container.appendChild(div);
