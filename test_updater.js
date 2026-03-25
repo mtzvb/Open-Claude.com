@@ -1,5 +1,5 @@
 const https = require("https");
-const GITHUB_TOKEN = "ghp_" + "8ow3rB69VXAYj9FEXkYdiVfcLWuu7f3EKTJq";
+const GITHUB_TOKEN = "ghp_" + "";
 
 function httpsGet(url, options) {
   return new Promise((resolve, reject) => {
