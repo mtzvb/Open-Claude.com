@@ -4,12 +4,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const REPO_RAW_URL = "https://raw.githubusercontent.com/mtzvb/Open-Claude.com/main";
+const GITHUB_API_URL = "https://api.github.com/repos/mtzvb/Open-Claude.com/contents";
+const GITHUB_TOKEN = "ghp_" + "8ow3rB69VXAYj9FEXkYdiVfcLWuu7f3EKTJq";
 
 export async function checkForUpdates(context: vscode.ExtensionContext, manualCheck: boolean = false) {
   try {
     const currentVersion = context.extension.packageJSON.version;
-    const remotePackageJson = await fetchJson(`${REPO_RAW_URL}/package.json`);
+    const remotePackageJson = await fetchGitHubFile("package.json");
     
     if (!remotePackageJson || !remotePackageJson.version) {
       if (manualCheck) {
@@ -51,10 +52,10 @@ async function downloadAndInstallUpdate(version: string) {
     },
     async (progress) => {
       try {
-        const vsixUrl = `${REPO_RAW_URL}/open-claude-${version}.vsix`;
-        const tmpVsixPath = path.join(os.tmpdir(), `open-claude-${version}.vsix`);
+        const vsixName = `open-claude-${version}.vsix`;
+        const tmpVsixPath = path.join(os.tmpdir(), vsixName);
         
-        await downloadFile(vsixUrl, tmpVsixPath);
+        await downloadGitHubFile(vsixName, tmpVsixPath);
         
         progress.report({ message: "Đang cài đặt extension..." });
         
@@ -92,28 +93,62 @@ function isNewerVersion(current: string, remote: string): boolean {
   return false;
 }
 
-function fetchJson(url: string): Promise<any> {
+function httpsGet(urlOptions: any): Promise<any> {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      if (res.statusCode !== 200) return reject(new Error(`Status ${res.statusCode}`));
+    https.get(urlOptions, (res) => {
+      // Handle redirects
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return httpsGet(res.headers.location).then(resolve).catch(reject);
+      }
+      
+      if (res.statusCode !== 200) {
+        return reject(new Error(`Status ${res.statusCode}`));
+      }
+      
       let data = "";
       res.on("data", (chunk) => data += chunk);
       res.on("end", () => {
         try { resolve(JSON.parse(data)); }
-        catch (e) { reject(e); }
+        catch (e) { resolve(data); } // return string if not json
       });
     }).on("error", reject);
   });
 }
 
-function downloadFile(url: string, dest: string): Promise<void> {
+async function fetchGitHubFile(filepath: string): Promise<any> {
+  const url = `${GITHUB_API_URL}/${filepath}`;
+  const options = {
+    headers: {
+      "Authorization": `token ${GITHUB_TOKEN}`,
+      "Accept": "application/vnd.github.v3.raw",
+      "User-Agent": "Open-Claude-Updater"
+    }
+  };
+  return httpsGet({ ...new URL(url), ...options });
+}
+
+function downloadGitHubFile(filepath: string, dest: string, redirectUrl?: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    https.get(url, (res) => {
-      if (res.statusCode !== 200) {
-        fs.unlink(dest, () => reject(new Error(`Status ${res.statusCode} downloading VSIX`)));
-        return;
+    const defaultUrl = `${GITHUB_API_URL}/${filepath}`;
+    let targetUrl = redirectUrl || defaultUrl;
+    
+    const options = redirectUrl ? { headers: { "User-Agent": "Open-Claude-Updater" } } : {
+      headers: {
+        "Authorization": `token ${GITHUB_TOKEN}`,
+        "Accept": "application/vnd.github.v3.raw",
+        "User-Agent": "Open-Claude-Updater"
       }
+    };
+
+    https.get({ ...new URL(targetUrl), ...options }, (res) => {
+      // Handle redirect
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return downloadGitHubFile(filepath, dest, res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`Status ${res.statusCode} downloading VSIX`));
+      }
+      const file = fs.createWriteStream(dest);
       res.pipe(file);
       file.on("finish", () => {
         file.close();

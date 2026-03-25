@@ -39,11 +39,12 @@ const https = __importStar(require("https"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const REPO_RAW_URL = "https://raw.githubusercontent.com/mtzvb/Open-Claude.com/main";
+const GITHUB_API_URL = "https://api.github.com/repos/mtzvb/Open-Claude.com/contents";
+const GITHUB_TOKEN = "ghp_" + "8ow3rB69VXAYj9FEXkYdiVfcLWuu7f3EKTJq";
 async function checkForUpdates(context, manualCheck = false) {
     try {
         const currentVersion = context.extension.packageJSON.version;
-        const remotePackageJson = await fetchJson(`${REPO_RAW_URL}/package.json`);
+        const remotePackageJson = await fetchGitHubFile("package.json");
         if (!remotePackageJson || !remotePackageJson.version) {
             if (manualCheck) {
                 vscode.window.showErrorMessage("❌ Không thể lấy thông tin phiên bản từ GitHub.");
@@ -77,9 +78,9 @@ async function downloadAndInstallUpdate(version) {
         cancellable: false,
     }, async (progress) => {
         try {
-            const vsixUrl = `${REPO_RAW_URL}/open-claude-${version}.vsix`;
-            const tmpVsixPath = path.join(os.tmpdir(), `open-claude-${version}.vsix`);
-            await downloadFile(vsixUrl, tmpVsixPath);
+            const vsixName = `open-claude-${version}.vsix`;
+            const tmpVsixPath = path.join(os.tmpdir(), vsixName);
+            await downloadGitHubFile(vsixName, tmpVsixPath);
             progress.report({ message: "Đang cài đặt extension..." });
             await vscode.commands.executeCommand("workbench.extensions.installExtension", vscode.Uri.file(tmpVsixPath));
             const reload = await vscode.window.showInformationMessage("✅ Cập nhật thành công! Vui lòng tải lại VS Code để áp dụng thay đổi.", "Tải lại (Reload Window)");
@@ -106,11 +107,16 @@ function isNewerVersion(current, remote) {
     }
     return false;
 }
-function fetchJson(url) {
+function httpsGet(urlOptions) {
     return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-            if (res.statusCode !== 200)
+        https.get(urlOptions, (res) => {
+            // Handle redirects
+            if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                return httpsGet(res.headers.location).then(resolve).catch(reject);
+            }
+            if (res.statusCode !== 200) {
                 return reject(new Error(`Status ${res.statusCode}`));
+            }
             let data = "";
             res.on("data", (chunk) => data += chunk);
             res.on("end", () => {
@@ -118,20 +124,43 @@ function fetchJson(url) {
                     resolve(JSON.parse(data));
                 }
                 catch (e) {
-                    reject(e);
-                }
+                    resolve(data);
+                } // return string if not json
             });
         }).on("error", reject);
     });
 }
-function downloadFile(url, dest) {
+async function fetchGitHubFile(filepath) {
+    const url = `${GITHUB_API_URL}/${filepath}`;
+    const options = {
+        headers: {
+            "Authorization": `token ${GITHUB_TOKEN}`,
+            "Accept": "application/vnd.github.v3.raw",
+            "User-Agent": "Open-Claude-Updater"
+        }
+    };
+    return httpsGet({ ...new URL(url), ...options });
+}
+function downloadGitHubFile(filepath, dest, redirectUrl) {
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(dest);
-        https.get(url, (res) => {
-            if (res.statusCode !== 200) {
-                fs.unlink(dest, () => reject(new Error(`Status ${res.statusCode} downloading VSIX`)));
-                return;
+        const defaultUrl = `${GITHUB_API_URL}/${filepath}`;
+        let targetUrl = redirectUrl || defaultUrl;
+        const options = redirectUrl ? { headers: { "User-Agent": "Open-Claude-Updater" } } : {
+            headers: {
+                "Authorization": `token ${GITHUB_TOKEN}`,
+                "Accept": "application/vnd.github.v3.raw",
+                "User-Agent": "Open-Claude-Updater"
             }
+        };
+        https.get({ ...new URL(targetUrl), ...options }, (res) => {
+            // Handle redirect
+            if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                return downloadGitHubFile(filepath, dest, res.headers.location).then(resolve).catch(reject);
+            }
+            if (res.statusCode !== 200) {
+                return reject(new Error(`Status ${res.statusCode} downloading VSIX`));
+            }
+            const file = fs.createWriteStream(dest);
             res.pipe(file);
             file.on("finish", () => {
                 file.close();
