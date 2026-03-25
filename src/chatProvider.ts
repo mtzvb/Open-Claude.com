@@ -9,8 +9,18 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _messages: ChatMessage[] = [];
   private _abortFn?: () => void;
+  private _lastActiveEditor?: vscode.TextEditor;
 
-  constructor(private readonly _context: vscode.ExtensionContext) {}
+  constructor(private readonly _context: vscode.ExtensionContext) {
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor && editor.document.uri.scheme !== "output") {
+        this._lastActiveEditor = editor;
+      }
+    });
+    if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme !== "output") {
+      this._lastActiveEditor = vscode.window.activeTextEditor;
+    }
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -98,9 +108,9 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _addEditorContext() {
-    let editor = vscode.window.activeTextEditor;
+    let editor = vscode.window.activeTextEditor || this._lastActiveEditor;
     if (!editor) {
-      // Fallback to visible editors if webview has focus (support Remote SSH/VFS)
+      // Fallback to visible editors if we have absolutely nothing
       const visibleEditors = vscode.window.visibleTextEditors.filter(
         (e) => e.document.uri.scheme !== "output"
       );
@@ -199,7 +209,7 @@ export class OpenClaudeViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _insertCodeToEditor(code: string) {
-    let editor = vscode.window.activeTextEditor;
+    let editor = vscode.window.activeTextEditor || this._lastActiveEditor;
     if (!editor) {
       const visibleEditors = vscode.window.visibleTextEditors.filter(
         (e) => e.document.uri.scheme !== "output"

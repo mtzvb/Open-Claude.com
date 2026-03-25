@@ -42,6 +42,14 @@ class OpenClaudeViewProvider {
     constructor(_context) {
         this._context = _context;
         this._messages = [];
+        vscode.window.onDidChangeActiveTextEditor((editor) => {
+            if (editor && editor.document.uri.scheme !== "output") {
+                this._lastActiveEditor = editor;
+            }
+        });
+        if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.scheme !== "output") {
+            this._lastActiveEditor = vscode.window.activeTextEditor;
+        }
     }
     resolveWebviewView(webviewView, _context, _token) {
         this._view = webviewView;
@@ -116,9 +124,9 @@ class OpenClaudeViewProvider {
         this._addEditorContext();
     }
     _addEditorContext() {
-        let editor = vscode.window.activeTextEditor;
+        let editor = vscode.window.activeTextEditor || this._lastActiveEditor;
         if (!editor) {
-            // Fallback to visible editors if webview has focus (support Remote SSH/VFS)
+            // Fallback to visible editors if we have absolutely nothing
             const visibleEditors = vscode.window.visibleTextEditors.filter((e) => e.document.uri.scheme !== "output");
             if (visibleEditors.length > 0) {
                 editor = visibleEditors[0];
@@ -195,7 +203,7 @@ class OpenClaudeViewProvider {
         }
     }
     _insertCodeToEditor(code) {
-        let editor = vscode.window.activeTextEditor;
+        let editor = vscode.window.activeTextEditor || this._lastActiveEditor;
         if (!editor) {
             const visibleEditors = vscode.window.visibleTextEditors.filter((e) => e.document.uri.scheme !== "output");
             if (visibleEditors.length > 0) {
