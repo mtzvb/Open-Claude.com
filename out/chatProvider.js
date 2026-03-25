@@ -206,10 +206,38 @@ class OpenClaudeViewProvider {
         }
         this._messages.push({ role: "user", content });
         this._postMessage({ type: "startAssistant" });
+        // --- TOKEN OPTIMIZATION ---
+        // 1. Sliding Window (Last 15 messages + System Prompt)
+        let historyToSend = [...this._messages];
+        const maxHistory = 15;
+        if (historyToSend.length > maxHistory) {
+            const sys = historyToSend.length > 0 && historyToSend[0].role === "system" ? historyToSend[0] : null;
+            historyToSend = historyToSend.slice(-(maxHistory - (sys ? 1 : 0)));
+            if (sys && historyToSend[0] !== sys) {
+                historyToSend.unshift(sys);
+            }
+        }
+        // 2. Token Optimization: Compress old images
+        // Tránh gửi lại mảng Base64 khổng lồ trong các lượt chat cũ gây tốn hàng chục nghìn Token.
+        historyToSend = historyToSend.map((msg, index) => {
+            // Bỏ qua tin nhắn cuối cùng (tin nhắn hiện tại)
+            if (index === historyToSend.length - 1)
+                return msg;
+            if (msg.role === "user" && Array.isArray(msg.content)) {
+                const compressedContent = msg.content.map(block => {
+                    if (block.type === "image" || block.type === "image_url") {
+                        return { type: "text", text: "\n[🖼️ Hình ảnh đã được hệ thống tự ẩn khỏi bộ nhớ lịch sử để tối ưu chi phí Token]\n" };
+                    }
+                    return block;
+                });
+                return { ...msg, content: compressedContent };
+            }
+            return msg;
+        });
         const client = new apiClient_1.ApiClient(apiKey, baseUrl);
         let fullResponse = "";
         try {
-            const stream = client.streamChat(this._messages, model, maxTokens, temperature, (abort) => {
+            const stream = client.streamChat(historyToSend, model, maxTokens, temperature, (abort) => {
                 this._abortFn = abort;
             });
             for await (const chunk of stream) {
