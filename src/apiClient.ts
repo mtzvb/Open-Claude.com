@@ -4,7 +4,7 @@ import { URL } from "url";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | any[];
 }
 
 export interface StreamChunk {

@@ -52,6 +52,7 @@
   // --- Event Listeners ---
   userInput.addEventListener("input",    autoResize);
   userInput.addEventListener("keydown",  handleKeyDown);
+  userInput.addEventListener("paste",    handlePaste);
   btnSend.addEventListener("click",      sendMessage);
   btnStop.addEventListener("click",      stopGeneration);
   btnClear.addEventListener("click",     clearChat);
@@ -170,8 +171,11 @@
     if (!text && attachedContexts.length === 0) return;
 
     let finalPrompt = "";
-    if (attachedContexts.length > 0) {
-      attachedContexts.forEach(ctx => {
+    const textContexts = attachedContexts.filter(c => !c.isImage);
+    const imageContexts = attachedContexts.filter(c => c.isImage).map(c => ({ url: c.url }));
+
+    if (textContexts.length > 0) {
+      textContexts.forEach(ctx => {
         finalPrompt += ctx.text + "\n\n";
       });
     }
@@ -188,7 +192,7 @@
     userInput.value = "";
     autoResize();
 
-    vscode.postMessage({ type: "sendMessage", text: finalPrompt, model: currentModel });
+    vscode.postMessage({ type: "sendMessage", text: finalPrompt, images: imageContexts, model: currentModel });
   }
 
   function stopGeneration() {
@@ -212,7 +216,10 @@
     let pillsHtml = "";
     if (contexts && contexts.length > 0) {
       pillsHtml = `<div class="context-pills" style="margin-bottom: 8px;">` + 
-        contexts.map(c => `<div class="pill">📎 ${escapeHtml(c.fileName)}</div>`).join("") + 
+        contexts.map(c => {
+          const icon = c.isImage ? "🖼️" : "📎";
+          return `<div class="pill">${icon} ${escapeHtml(c.fileName)}</div>`;
+        }).join("") + 
         `</div>`;
     }
 
@@ -424,9 +431,34 @@
   }
 
   function addContextMessage(fileName, text) {
-    attachedContexts.push({ fileName, text });
+    attachedContexts.push({ fileName, text, isImage: false });
     renderPills();
     userInput.focus();
+  }
+
+  function handlePaste(e) {
+    if (!e.clipboardData) return;
+    const items = e.clipboardData.items;
+    let hasImage = false;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") === 0) {
+        hasImage = true;
+        const blob = item.getAsFile();
+        if (!blob) continue;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64Data = event.target.result;
+          const fileName = "Image_" + (attachedContexts.filter(c => c.isImage).length + 1) + ".png";
+          attachedContexts.push({ isImage: true, url: base64Data, fileName });
+          renderPills();
+        };
+        reader.readAsDataURL(blob);
+      }
+    }
+    if (hasImage) {
+      e.preventDefault();
+    }
   }
 
   function renderPills() {
@@ -436,8 +468,9 @@
     attachedContexts.forEach((ctx, idx) => {
       const div = document.createElement("div");
       div.className = "pill";
+      const icon = ctx.isImage ? "🖼️" : "📎";
       div.innerHTML = `
-        <span>📎 ${escapeHtml(ctx.fileName)}</span>
+        <span>${icon} ${escapeHtml(ctx.fileName)}</span>
         <span class="remove-pill" data-idx="${idx}">✕</span>
       `;
       container.appendChild(div);

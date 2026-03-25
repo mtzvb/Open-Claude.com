@@ -62,7 +62,7 @@ class OpenClaudeViewProvider {
         webviewView.webview.onDidReceiveMessage(async (msg) => {
             switch (msg.type) {
                 case "sendMessage":
-                    await this._handleSendMessage(msg.text, msg.model);
+                    await this._handleSendMessage(msg.text, msg.model, msg.images);
                     break;
                 case "stopGeneration":
                     if (this._abortFn) {
@@ -159,7 +159,7 @@ class OpenClaudeViewProvider {
         vscode.window.showInformationMessage("Cấu hình Open Claude đã được lưu!");
         this._sendConfig();
     }
-    async _handleSendMessage(userText, model) {
+    async _handleSendMessage(userText, model, images) {
         const config = vscode.workspace.getConfiguration("openclaude");
         const apiKey = config.get("apiKey", "");
         const baseUrl = config.get("baseUrl", "https://open-claude.com/v1");
@@ -177,7 +177,32 @@ class OpenClaudeViewProvider {
         if (this._messages.length === 0 && systemPrompt) {
             this._messages.push({ role: "system", content: systemPrompt });
         }
-        this._messages.push({ role: "user", content: userText });
+        let content = userText;
+        if (images && images.length > 0) {
+            content = [];
+            if (model.startsWith("claude")) {
+                for (const img of images) {
+                    const match = img.url.match(/^data:(image\/[a-zA-Z]+);base64,(.*)$/);
+                    if (match) {
+                        content.push({
+                            type: "image",
+                            source: { type: "base64", media_type: match[1], data: match[2] }
+                        });
+                    }
+                }
+                content.push({ type: "text", text: userText || "Mô tả ảnh này" });
+            }
+            else {
+                for (const img of images) {
+                    content.push({
+                        type: "image_url",
+                        image_url: { url: img.url }
+                    });
+                }
+                content.push({ type: "text", text: userText || "Mô tả ảnh này" });
+            }
+        }
+        this._messages.push({ role: "user", content });
         this._postMessage({ type: "startAssistant" });
         const client = new apiClient_1.ApiClient(apiKey, baseUrl);
         let fullResponse = "";
