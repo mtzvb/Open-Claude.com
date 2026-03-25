@@ -486,3 +486,25 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
   color: #f87171;
 }
 .stop-btn:hover { background: rgba(248,113,113,0.25); }
+
+/* History Panel */
+.history-item {
+  padding: 8px; border-radius: var(--radius-sm);
+  background: var(--bg-input); margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; border: 1px solid transparent; transition: 0.2s;
+}
+.history-item:hover {
+  border-color: var(--border); background: rgba(255, 255, 255, 0.05);
+}
+.history-title {
+  font-size: 13px; font-weight: 500; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 200px;
+}
+.history-date {
+  font-size: 11px; color: var(--text-secondary); margin-top: 4px;
+}
+.history-actions button:hover {
+  background: rgba(255, 50, 50, 0.2) !important; color: #ff6b6b !important;
+}

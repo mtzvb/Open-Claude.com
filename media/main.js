@@ -44,6 +44,11 @@
   const btnCloseSettings= document.getElementById("btnCloseSettings");
   const btnCheckUpdate   = document.getElementById("btnCheckUpdate");
 
+  const btnHistory      = document.getElementById("btnHistory");
+  const historyPanel    = document.getElementById("historyPanel");
+  const btnCloseHistory = document.getElementById("btnCloseHistory");
+  const historyList     = document.getElementById("historyList");
+
   // --- Init ---
   vscode.postMessage({ type: "getConfig" });
 
@@ -84,6 +89,15 @@
     closeSettings();
   });
   btnCloseSettings.addEventListener("click", closeSettings);
+  
+  btnHistory.addEventListener("click", () => {
+    vscode.postMessage({ type: "loadHistory" });
+    historyPanel.classList.remove("hidden");
+    settingsPanel.classList.add("hidden");
+  });
+  btnCloseHistory.addEventListener("click", () => {
+    historyPanel.classList.add("hidden");
+  });
   
   if (btnCheckUpdate) {
     btnCheckUpdate.addEventListener("click", () => {
@@ -127,6 +141,13 @@
         break;
       case "addContext":
         addContextMessage(msg.fileName, msg.text);
+        break;
+      case "historyData":
+        renderHistory(msg.conversations);
+        break;
+      case "loadMessages":
+        restoreMessages(msg.messages);
+        historyPanel.classList.add("hidden");
         break;
     }
   });
@@ -502,6 +523,84 @@
   function scrollToBottom() {
     const container = document.getElementById("chatContainer");
     container.scrollTop = container.scrollHeight;
+  }
+
+  function renderHistory(conversations) {
+    if (!historyList) return;
+    historyList.innerHTML = "";
+    if (!conversations || conversations.length === 0) {
+      historyList.innerHTML = "<div style='color: var(--text-secondary); font-size: 12px; text-align: center; margin-top: 20px;'>Chưa có lịch sử hội thoại.</div>";
+      return;
+    }
+
+    conversations.forEach(conv => {
+      const date = new Date(conv.updatedAt).toLocaleString("vi-VN");
+      const div = document.createElement("div");
+      div.className = "history-item";
+      div.innerHTML = `
+        <div class="history-info" style="flex: 1; overflow: hidden; margin-right: 8px;">
+          <div class="history-title" title="\${escapeHtml(conv.title)}">\${escapeHtml(conv.title)}</div>
+          <div class="history-date">\${date}</div>
+        </div>
+        <div class="history-actions">
+          <button class="delete-chat" data-id="\${conv.id}" title="Xóa Chat" style="background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg>
+          </button>
+        </div>
+      `;
+      
+      div.querySelector(".history-info").addEventListener("click", () => {
+        vscode.postMessage({ type: "switchChat", chatId: conv.id });
+      });
+
+      div.querySelector(".delete-chat").addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (confirm("Xóa đoạn chat này khỏi bộ nhớ?")) {
+          vscode.postMessage({ type: "deleteChat", chatId: conv.id });
+        }
+      });
+      historyList.appendChild(div);
+    });
+  }
+
+  function restoreMessages(messages) {
+    const welcomeCard = document.querySelector(".welcome-card");
+    if (welcomeCard) welcomeCard.remove();
+    
+    messageList.innerHTML = ""; 
+    
+    if (messages.length === 0) {
+      clearMessages(); // will render welcome card
+      return;
+    }
+
+    messages.forEach(msg => {
+      if (msg.role === "system") return; 
+      
+      if (msg.role === "user") {
+        let text = "";
+        let hasImagePlaceholder = false;
+
+        if (typeof msg.content === "string") {
+          text = msg.content;
+        } else if (Array.isArray(msg.content)) {
+          msg.content.forEach(block => {
+            if (block.type === "text") {
+              text += block.text + "\\n";
+            } else if (block.type === "image" || block.type === "image_url") {
+              // History nạp lại một mảng object gốc có image_url
+              hasImagePlaceholder = true;
+            }
+          });
+        }
+        
+        appendUserMessage(text.trim(), []); 
+      } else if (msg.role === "assistant") {
+        appendAssistantMessage(msg.content);
+      }
+    });
+
+    scrollToBottom();
   }
 
   function escapeHtml(text) {

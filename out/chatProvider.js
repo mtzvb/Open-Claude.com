@@ -42,6 +42,7 @@ class OpenClaudeViewProvider {
     constructor(_context) {
         this._context = _context;
         this._messages = [];
+        this._currentChatId = Date.now().toString();
         vscode.window.onDidChangeActiveTextEditor((editor) => {
             if (editor && editor.document.uri.scheme !== "output") {
                 this._lastActiveEditor = editor;
@@ -71,8 +72,16 @@ class OpenClaudeViewProvider {
                     }
                     break;
                 case "clearChat":
-                    this._messages = [];
-                    this._postMessage({ type: "cleared" });
+                    this._createNewChat();
+                    break;
+                case "loadHistory":
+                    this._sendHistory();
+                    break;
+                case "switchChat":
+                    this._switchChat(msg.chatId);
+                    break;
+                case "deleteChat":
+                    this._deleteChat(msg.chatId);
                     break;
                 case "insertCode":
                     this._insertCodeToEditor(msg.code);
@@ -160,6 +169,71 @@ class OpenClaudeViewProvider {
         await config.update("githubToken", settings.githubToken, vscode.ConfigurationTarget.Global);
         vscode.window.showInformationMessage("Cấu hình Open Claude đã được lưu!");
         this._sendConfig();
+    }
+    _createNewChat() {
+        this._messages = [];
+        this._currentChatId = Date.now().toString();
+        this._postMessage({ type: "cleared" });
+    }
+    async _saveCurrentChat() {
+        let conversations = this._context.globalState.get("openclaude.history") || [];
+        if (this._messages.length === 0)
+            return;
+        let firstUserMsg = this._messages.find(m => m.role === "user");
+        let title = "Hội thoại mới";
+        if (firstUserMsg) {
+            if (typeof firstUserMsg.content === "string") {
+                title = firstUserMsg.content.substring(0, 40);
+            }
+            else if (Array.isArray(firstUserMsg.content)) {
+                let textBlock = firstUserMsg.content.find(b => b.type === "text");
+                if (textBlock && textBlock.text)
+                    title = textBlock.text.substring(0, 40);
+            }
+        }
+        const existingIndex = conversations.findIndex(c => c.id === this._currentChatId);
+        if (existingIndex >= 0) {
+            conversations[existingIndex].messages = this._messages;
+            conversations[existingIndex].updatedAt = Date.now();
+        }
+        else {
+            conversations.push({
+                id: this._currentChatId,
+                title: title + "...",
+                messages: this._messages,
+                updatedAt: Date.now()
+            });
+        }
+        conversations.sort((a, b) => b.updatedAt - a.updatedAt);
+        if (conversations.length > 50)
+            conversations = conversations.slice(0, 50);
+        await this._context.globalState.update("openclaude.history", conversations);
+        this._sendHistory();
+    }
+    _sendHistory() {
+        const conversations = this._context.globalState.get("openclaude.history") || [];
+        this._postMessage({ type: "historyData", conversations });
+    }
+    _switchChat(chatId) {
+        const conversations = this._context.globalState.get("openclaude.history") || [];
+        const chat = conversations.find(c => c.id === chatId);
+        if (chat) {
+            this._currentChatId = chat.id;
+            this._messages = chat.messages || [];
+            this._postMessage({ type: "loadMessages", messages: this._messages, chatId });
+        }
+    }
+    async _deleteChat(chatId) {
+        let conversations = this._context.globalState.get("openclaude.history") || [];
+        conversations = conversations.filter(c => c.id !== chatId);
+        await this._context.globalState.update("openclaude.history", conversations);
+        if (this._currentChatId === chatId) {
+            this._createNewChat();
+            this._sendHistory();
+        }
+        else {
+            this._sendHistory();
+        }
     }
     async _handleSendMessage(userText, model, images) {
         const config = vscode.workspace.getConfiguration("openclaude");
@@ -258,6 +332,7 @@ class OpenClaudeViewProvider {
         }
         finally {
             this._abortFn = undefined;
+            await this._saveCurrentChat();
         }
     }
     _insertCodeToEditor(code) {
@@ -381,6 +456,11 @@ class OpenClaudeViewProvider {
         <select id="modelSelect" class="model-select" title="Chọn model AI">
           <option value="claude-opus-4.6">Claude Opus 4.6</option>
         </select>
+        <button id="btnHistory" class="icon-btn" title="Lịch sử Chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="12 8 12 12 14 14" /><circle cx="12" cy="12" r="10" />
+          </svg>
+        </button>
         <button id="btnSettings" class="icon-btn" title="Settings">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -436,6 +516,17 @@ class OpenClaudeViewProvider {
       <div class="settings-actions" style="margin-top: 4px;">
         <button id="btnCheckUpdate" class="btn-secondary" style="width: 100%;">Kiểm tra bản cập nhật mới nhất</button>
       </div>
+    </div>
+
+    <!-- History Panel -->
+    <div id="historyPanel" class="settings-panel hidden" style="max-height: 80vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="margin: 0;">Lịch sử Chat</h2>
+        <button id="btnCloseHistory" class="icon-btn" title="Đóng">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="historyList"></div>
     </div>
 
     <!-- Messages -->
