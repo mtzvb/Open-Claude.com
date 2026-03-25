@@ -79,6 +79,9 @@ class OpenClaudeViewProvider {
                 case "getConfig":
                     this._sendConfig();
                     break;
+                case "saveSettings":
+                    await this._saveSettings(msg.settings);
+                    break;
                 case "addContext":
                     this._addEditorContext();
                     break;
@@ -98,6 +101,9 @@ class OpenClaudeViewProvider {
             apiKey: config.get("apiKey", ""),
             baseUrl: config.get("baseUrl", "https://open-claude.com/v1"),
             model: config.get("model", "claude-opus-4.6"),
+            maxTokens: config.get("maxTokens", 8192),
+            temperature: config.get("temperature", 0.7),
+            systemPrompt: config.get("systemPrompt", "You are Open Claude..."),
             models: models_1.MODELS,
         });
     }
@@ -126,6 +132,16 @@ class OpenClaudeViewProvider {
         if (this._view && !this._view.visible) {
             this._view.show(true);
         }
+    }
+    async _saveSettings(settings) {
+        const config = vscode.workspace.getConfiguration("openclaude");
+        await config.update("apiKey", settings.apiKey, vscode.ConfigurationTarget.Global);
+        await config.update("baseUrl", settings.baseUrl, vscode.ConfigurationTarget.Global);
+        await config.update("maxTokens", Number(settings.maxTokens), vscode.ConfigurationTarget.Global);
+        await config.update("temperature", Number(settings.temperature), vscode.ConfigurationTarget.Global);
+        await config.update("systemPrompt", settings.systemPrompt, vscode.ConfigurationTarget.Global);
+        vscode.window.showInformationMessage("Cấu hình Open Claude đã được lưu!");
+        this._sendConfig();
     }
     async _handleSendMessage(userText, model) {
         const config = vscode.workspace.getConfiguration("openclaude");
@@ -249,6 +265,37 @@ class OpenClaudeViewProvider {
     <div id="apiKeyWarning" class="api-warning hidden">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span>Chưa có API Key. <a href="#" id="linkSettings">Cấu hình ngay →</a></span>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="settings-panel hidden">
+      <h2>Cấu hình Open Claude</h2>
+      <div class="setting-item">
+        <label>API Key</label>
+        <input type="password" id="setApiKey" placeholder="Nhập API Key (bắt buộc)..." />
+      </div>
+      <div class="setting-item">
+        <label>Base URL</label>
+        <input type="text" id="setBaseUrl" placeholder="https://open-claude.com/v1" />
+      </div>
+      <div class="setting-item row">
+        <div class="setting-item-half">
+          <label>Max Tokens</label>
+          <input type="number" id="setMaxTokens" value="8192" />
+        </div>
+        <div class="setting-item-half">
+          <label>Temperature</label>
+          <input type="number" id="setTemp" value="0.7" step="0.1" max="2" />
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>System Prompt</label>
+        <textarea id="setSystemPrompt" rows="4"></textarea>
+      </div>
+      <div class="settings-actions">
+        <button id="btnSaveSettings" class="btn-primary">Lưu cấu hình</button>
+        <button id="btnCloseSettings" class="btn-secondary">Đóng</button>
+      </div>
     </div>
 
     <!-- Messages -->

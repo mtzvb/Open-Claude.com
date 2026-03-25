@@ -361,6 +361,38 @@ html, body { height: 100%; overflow: hidden; background: var(--bg-base); color: 
   line-height: 1.5;
 }
 
+/* ── Settings Panel ── */
+.settings-panel {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.settings-panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text-primary); }
+.setting-item { display: flex; flex-direction: column; gap: 6px; }
+.setting-item.row { flex-direction: row; gap: 12px; }
+.setting-item-half { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.setting-item label { font-size: 11.5px; font-weight: 500; color: var(--text-secondary); }
+.setting-item input, .setting-item textarea {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); padding: 8px 10px;
+  color: var(--text-primary); font-family: inherit; font-size: 12px;
+  outline: none; transition: border-color 0.2s;
+}
+.setting-item input:focus, .setting-item textarea:focus { border-color: var(--accent-purple); }
+.settings-actions { display: flex; gap: 8px; margin-top: 8px; }
+.btn-primary, .btn-secondary {
+  flex: 1; padding: 8px; border-radius: var(--radius-xs); font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; transition: all 0.2s;
+}
+.btn-primary { background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); color: white; }
+.btn-primary:active { transform: scale(0.96); }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
 /* ── Input Area ── */
 #inputArea {
   padding: 8px 10px 10px;

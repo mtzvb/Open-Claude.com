@@ -27,6 +27,18 @@
   const apiKeyWarning = document.getElementById("apiKeyWarning");
   const linkSettings  = document.getElementById("linkSettings");
   const tokenDisplay  = document.getElementById("tokenCountDisplay");
+  
+  // Settings Panel
+  const chatContainer = document.getElementById("chatContainer");
+  const inputArea     = document.getElementById("inputArea");
+  const settingsPanel = document.getElementById("settingsPanel");
+  const setApiKey     = document.getElementById("setApiKey");
+  const setBaseUrl    = document.getElementById("setBaseUrl");
+  const setMaxTokens  = document.getElementById("setMaxTokens");
+  const setTemp       = document.getElementById("setTemp");
+  const setSystemPrompt = document.getElementById("setSystemPrompt");
+  const btnSaveSettings = document.getElementById("btnSaveSettings");
+  const btnCloseSettings = document.getElementById("btnCloseSettings");
 
   // --- Init ---
   vscode.postMessage({ type: "getConfig" });
@@ -46,6 +58,21 @@
   modelSelect.addEventListener("change", () => {
     currentModel = modelSelect.value;
   });
+  
+  btnSaveSettings.addEventListener("click", () => {
+    vscode.postMessage({
+      type: "saveSettings",
+      settings: {
+        apiKey: setApiKey.value.trim(),
+        baseUrl: setBaseUrl.value.trim(),
+        maxTokens: parseInt(setMaxTokens.value) || 8192,
+        temperature: parseFloat(setTemp.value) || 0.7,
+        systemPrompt: setSystemPrompt.value
+      }
+    });
+    closeSettings();
+  });
+  btnCloseSettings.addEventListener("click", closeSettings);
 
   // Quick action buttons
   document.querySelectorAll(".quick-btn").forEach((btn) => {
@@ -104,6 +131,13 @@
       if (m.id === currentModel) opt.selected = true;
       modelSelect.appendChild(opt);
     });
+
+    // Populate settings panel
+    if (cfg.apiKey !== undefined) setApiKey.value = cfg.apiKey;
+    if (cfg.baseUrl !== undefined) setBaseUrl.value = cfg.baseUrl;
+    if (cfg.maxTokens !== undefined) setMaxTokens.value = cfg.maxTokens;
+    if (cfg.temperature !== undefined) setTemp.value = cfg.temperature;
+    if (cfg.systemPrompt !== undefined) setSystemPrompt.value = cfg.systemPrompt;
 
     // API key warning
     if (!cfg.apiKey) {
@@ -338,8 +372,17 @@
   }
 
   function openSettings(e) {
-    e.preventDefault();
-    vscode.postMessage({ type: "openSettings" });
+    if (e) e.preventDefault();
+    chatContainer.classList.add("hidden");
+    inputArea.classList.add("hidden");
+    settingsPanel.classList.remove("hidden");
+  }
+
+  function closeSettings() {
+    settingsPanel.classList.add("hidden");
+    chatContainer.classList.remove("hidden");
+    inputArea.classList.remove("hidden");
+    scrollToBottom();
   }
 
   function addContext() {
